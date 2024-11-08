@@ -4,6 +4,7 @@ const mongoose=require("mongoose");
 const path=require("path");
 const Chat=require("./model/chat.js");
 const methodOverride=require("method-override");
+const expressError=require("./eror/expressError");
 
 
 app.set("views",path.join(__dirname,"views"));
@@ -77,6 +78,24 @@ app.delete("/chats/:id",(req,res)=>{
     })
 })
 
+//show 
+
+app.get("/chats/:id",async(req,res,next)=>{
+    let {id}=req.params;
+   let c= await Chat.findById(id)
+
+    if(!c){
+        next(new expressError(404,"chat not found"));
+    }
+    res.render("show.ejs",{c});
+})
+
+//error handler
+
+app.use((err,req,res,next)=>{
+    let {status=500,message="error occured"}=err;
+    res.status(status).send(message);
+})
 //DB
 async function main() {
     await mongoose.connect("mongodb://127.0.0.1:27017/whatsapp");
