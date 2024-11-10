@@ -17,15 +17,24 @@ app.listen(8080,()=>{
     console.log("server start");
 });
 
+function asyncWrap(fn){
+
+    return function(req,res,next){
+        fn(req,res,next).catch((err)=>next(err));
+    }
+}
+
 app.get("/",(req,res)=>{
     res.send("on root ");
 })
 
 //index route
-app.get("/chats",async(req,res)=>{
-    let chats=await Chat.find();
-    res.render("index.ejs",{chats})
-})
+app.get("/chats",asyncWrap(async(req,res)=>{
+    
+        let chats=await Chat.find();
+        res.render("index.ejs",{chats})
+    
+}))
 
 //create chat route
 
@@ -33,63 +42,80 @@ app.get("/chats/new",(req,res)=>{
     res.render("new.ejs");
 })
 
-app.post("/chats",(req,res)=>{
-    let {from,message,to}=req.body;
+app.post("/chats",asyncWrap(async(req,res,next)=>{
+   
+    
+        let {from,message,to}=req.body;
+        const chat1=new Chat({
+            from:from,
+            message:message,
+            to:to,
+            created_at:new Date(),
+        });
+    
+        await chat1.save()
+    
 
-    const chat1=new Chat({
-        from:from,
-        message:message,
-        to:to,
-        created_at:new Date(),
-    });
-
-    chat1.save()
-    .then(()=>{
-        console.log("inserted")
-    })
+    
     res.redirect("/chats");
-})
+}));
 
 //edit route
 
-app.get("/chats/:id/edit",async(req,res)=>{
-    let{id}=req.params;
-    let chat=await Chat.findById(id);
-    res.render("edit.ejs",{chat})
-})
+app.get("/chats/:id/edit",asyncWrap(async(req,res)=>{
+        let{id}=req.params;
+        let chat=await Chat.findById(id);
+        res.render("edit.ejs",{chat})
+}));
 
-app.patch("/chats/:id",async(req,res)=>{
-    let {id}=req.params;
-    const {message}=req.body;
-   await Chat.updateOne({_id:id},{message:message,updated_at: new Date()},{runValidators:true,new:true});
+app.patch("/chats/:id",asyncWrap(async(req,res)=>{
 
-   res.redirect("/chats");
-
-})
+        let {id}=req.params;
+        const {message}=req.body;
+       await Chat.updateOne({_id:id},{message:message,updated_at: new Date()},{runValidators:true,new:true});
+    
+       res.redirect("/chats");
+    
+}));
 
 //delete route
 
-app.delete("/chats/:id",(req,res)=>{
-    let {id}=req.params;
+app.delete("/chats/:id",asyncWrap(((req,res)=>{
+    
+        let {id}=req.params;
 
-    Chat.deleteOne({_id:id})
-    .then(()=>{
-        res.redirect("/chats");
-    })
-})
+        Chat.deleteOne({_id:id})
+    
+            res.redirect("/chats");
+    
+})));
 
 //show 
 
-app.get("/chats/:id",async(req,res,next)=>{
-    let {id}=req.params;
-   let c= await Chat.findById(id)
+app.get("/chats/:id",asyncWrap(async(req,res,next)=>{
+    
+        let {id}=req.params;
+        
+        let c= await Chat.findById(id)
+     
+         if(!c){
+             next(new expressError(404,"chat not found"));
+         }
+         res.render("show.ejs",{c});
+    
+    
+}));
 
-    if(!c){
-        next(new expressError(404,"chat not found"));
+function validation(err){
+    console.log("this was validation error",err.message);
+    return err;
+}
+app.use((err,req,res,next)=>{
+    if(err.name=="ValidationError"){
+      err=validation(err);
     }
-    res.render("show.ejs",{c});
+    next(err);
 })
-
 //error handler
 
 app.use((err,req,res,next)=>{
